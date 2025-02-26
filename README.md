@@ -31,7 +31,7 @@ This plugin however:
 ## Installation
 
 ```bash
-ya pack -a xuyangy/delta.yazi
+ya pack -a xuyangy/delta
 ```
 ## Usage
 
