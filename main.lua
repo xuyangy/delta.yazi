@@ -12,6 +12,21 @@ local function is_inside_tmux()
     return os.getenv("TMUX") ~= nil
 end
 
+local function terminal_width()
+    local output
+    if is_inside_tmux() then
+        output = Command("tmux"):arg({ "display-message", "-p", "#{window_width}" }):output()
+    else
+        output = Command("tput"):arg("cols"):output()
+    end
+
+    if not output then
+        return nil
+    end
+
+    return tonumber(output.stdout:match("%d+"))
+end
+
 local selected_url = ya.sync(function()
     for _, u in pairs(cx.active.selected) do
         return u
@@ -33,6 +48,12 @@ return {
         end
 
         local args = { "--side-by-side", "--paging=never", "--line-numbers" }
+        local width = terminal_width()
+        if width then
+            args[#args + 1] = "-w"
+            args[#args + 1] = tostring(width)
+        end
+
         local output, err = Command("delta"):arg(args):arg(tostring(a)):arg(tostring(b)):output()
         if not output then
             return info("Failed to run diff, error: " .. tostring(err))
