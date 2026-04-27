@@ -32,26 +32,37 @@ return {
             return info("No file hovered")
         end
 
-        local function get_terminal_width()
-            local handle = io.popen("tput cols")
-            local result = handle:read("*a")
-            handle:close()
-            return tonumber(result)
-        end
-        local args = { "--side-by-side", "--paging=never", "--line-numbers", "-w", get_terminal_width() }
-        local output, err = Command("delta"):args(args):arg(tostring(a)):arg(tostring(b)):output()
+        local args = { "--side-by-side", "--paging=never", "--line-numbers" }
+        local output, err = Command("delta"):arg(args):arg(tostring(a)):arg(tostring(b)):output()
         if not output then
-            return info("Failed to run diff, error: " .. err)
+            return info("Failed to run diff, error: " .. tostring(err))
         elseif output.stdout == "" then
             return info("No differences found")
         end
 
         local tmpfile = os.tmpname()
-        local file = io.open(tmpfile, "w")
+        local file, open_err = io.open(tmpfile, "w")
+        if not file then
+            return info("Failed to create temporary diff file, error: " .. tostring(open_err))
+        end
         file:write(output.stdout)
         file:close()
         if is_inside_tmux() then
-            os.execute("tmux new-window 'less " .. tmpfile .. " && rm -f " .. tmpfile .. " || rm -f " .. tmpfile .. "'")
+            local status, tmux_err = Command("tmux")
+                :arg({
+                    "new-window",
+                    "sh",
+                    "-c",
+                    'less -R "$1"; code=$?; rm -f "$1"; exit $code',
+                    "sh",
+                    tmpfile,
+                })
+                :status()
+            if not status then
+                return info("Failed to open diff in tmux, error: " .. tostring(tmux_err))
+            elseif not status.success then
+                return info("Failed to open diff in tmux, exit code: " .. tostring(status.code))
+            end
         else
             ya.clipboard(output.stdout)
             info("Not inside Tmux, diff copied to clipboard")
